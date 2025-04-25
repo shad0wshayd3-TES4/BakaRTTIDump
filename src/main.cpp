@@ -430,7 +430,7 @@ namespace
 			try
 			{
 				dump_rtti();
-			//	dump_nirtti();
+				//	dump_nirtti();
 
 				OBSE::stl::report_and_fail("Done!");
 			}
