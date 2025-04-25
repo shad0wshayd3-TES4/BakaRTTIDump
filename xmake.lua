@@ -5,7 +5,7 @@ set_xmakever("2.9.4")
 includes("extern/commonlibob64")
 
 -- set project
-set_project("@ProjectName@")
+set_project("BakaRTTIDump")
 set_version("1.0.0")
 set_license("GPL-3.0")
 
@@ -24,14 +24,14 @@ add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
 
 -- setup targets
-target("@ProjectName@")
+target("BakaRTTIDump")
     -- bind local dependencies
     add_deps("commonlibob64")
 
     -- add commonlibob64 plugin
     add_rules("commonlibob64.plugin", {
-        name = "@ProjectName@",
-        author = "@PluginAuthor@"
+        name = "BakaRTTIDump",
+        author = "shad0wshayd3-TES4"
     })
 
     -- add source files
