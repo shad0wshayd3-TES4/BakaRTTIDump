@@ -326,36 +326,22 @@ void dump_rtti()
 	closef();
 }
 
-/*
 void dump_nirtti()
 {
-	{
-		// fix a dumb fuckup
-		REL::Relocation<RE::NiRTTI*> rtti{ REL::ID(2690507) };
-		rtti->name = "BGSStaticCollection::RootFacade";
-	}
-
 	constexpr std::array seeds = {
-		2703473,  // NiObject
-		2703545,  // NiCullingProcess
-		2692702,  // BSFaceGenMorphData
-		2693100,  // BSTempEffect
-		2707081,  // bhkCharacterProxy
-		2707083,  // bhkCharacterRigidBody
-		2704798,  // bhkNPCollisionObject
-		2704796,  // bhkNPCollisionObjectBase
-		2704799,  // bhkNPCollisionObjectUnlinked
-		2704797,  // bhkNPCollisionProxyObject
-		2704800,  // bhkPhysicsSystem
-		2704801,  // bhkRagdollSystem
-		2704769,  // bhkWorld
-		2704838,  // bhkWorldM
+		0x94B79A0,  // NiObject
+		0x94C72F8,  // NiShader
+		0x94C9330,  // BSFaceGenMorphData
+		0x94C95A8,  // BSTempEffect
+		0x94C40F0,  // bhkCharacterProxy
+		0x94B5640,  // bhkWorld
+		0x94C6238,  // bhkWorldM
 	};
 	std::unordered_set<std::uintptr_t> results;
 	results.reserve(seeds.size());
 	for (const auto& seed : seeds)
 	{
-		results.insert(REL::ID(seed).address());
+		results.insert(REL::Offset(seed).address());
 	}
 
 	const auto& mod = REL::Module::get();
@@ -382,18 +368,19 @@ void dump_nirtti()
 	while (found);
 
 	std::vector<std::pair<std::string, std::uint64_t>> toPrint;
-	const auto& iddb = get_iddb();
+	// const auto& iddb = get_iddb();
 	for (const auto& result : results)
 	{
 		const auto rtti = reinterpret_cast<const RE::NiRTTI*>(result);
 		try
 		{
-			const auto id = iddb(result - base);
+			//const auto id = iddb(result - base);
+			const auto id = (result - base);
 			toPrint.emplace_back(sanitize_name(rtti->GetName()), id);
 		}
 		catch (const std::exception&)
 		{
-			spdlog::error(rtti->GetName());
+			REX::ERROR(rtti->GetName());
 		}
 	}
 
@@ -413,12 +400,11 @@ void dump_nirtti()
 		   << "\t{\n"sv;
 	for (const auto& elem : toPrint)
 	{
-		output << "\t\tinline constexpr REL::ID "sv << elem.first << "{ "sv << elem.second << " };\n"sv;
+		output << "\t\tinline constexpr REL::Offset "sv << elem.first << "{ "sv << elem.second << " };\n"sv;
 	}
 	output << "\t}\n"sv
 		   << "}\n"sv;
 }
-*/
 
 namespace
 {
@@ -430,7 +416,7 @@ namespace
 			try
 			{
 				dump_rtti();
-				//	dump_nirtti();
+				dump_nirtti();
 
 				OBSE::stl::report_and_fail("Done!");
 			}
