@@ -1,10 +1,9 @@
-/*
-[[nodiscard]] auto& get_iddb()
+[[nodiscard]] auto get_iddb()
 {
-	static REL::Offset2ID iddb;
+	auto iddb = REL::Offset2ID::GetSingleton();
+	iddb->load_v5();
 	return iddb;
 }
-*/
 
 class VTable
 {
@@ -223,7 +222,7 @@ void dump_rtti()
 	const auto data = mod->segment(REL::Segment::data);
 	const auto beg = data.pointer<const std::uintptr_t>();
 	const auto end = reinterpret_cast<const std::uintptr_t*>(data.address() + data.size());
-	// const auto& iddb = get_iddb();
+	const auto iddb = get_iddb();
 	for (auto iter = beg; iter < end; ++iter)
 	{
 		if (*iter == typeInfo[0].address())
@@ -231,10 +230,8 @@ void dump_rtti()
 			const auto typeDescriptor = reinterpret_cast<const RE::RTTI::TypeDescriptor*>(iter);
 			try
 			{
-				auto name = decode_name(typeDescriptor);
-				// const auto rid = iddb(reinterpret_cast<std::uintptr_t>(iter) - base);
-				const auto rid = reinterpret_cast<std::uintptr_t>(iter) - base;
-
+				auto                       name = decode_name(typeDescriptor);
+				const auto                 rid = iddb->get_id(reinterpret_cast<std::uintptr_t>(iter) - base);
 				VTable                     vtable{ typeDescriptor };
 				std::vector<std::uint64_t> vids(vtable.size());
 				std::transform(
@@ -242,8 +239,7 @@ void dump_rtti()
 					vtable.end(),
 					vids.begin(),
 					[&](auto&& a_elem)
-					// { return iddb(a_elem.offset()); });
-					{ return a_elem.offset(); });
+					{ return iddb->get_id(a_elem.offset()); });
 
 				results.emplace_back(sanitize_name(std::move(name)), rid, std::move(vids));
 			}
@@ -289,14 +285,14 @@ void dump_rtti()
 	for (const auto& [name, rid, vids] : results)
 	{
 		(void)vids;
-		file << "\t\tinline constexpr REL::Offset "sv << name << "{ "sv << rid << " };\n"sv;
+		file << "\t\tinline constexpr REL::ID "sv << name << "{ "sv << rid << " };\n"sv;
 	}
 	closef();
 
 	openf("VTABLE"sv);
 	const auto printVID = [&](std::uint64_t a_vid)
 	{
-		file << "REL::Offset("sv << a_vid << ")"sv;
+		file << "REL::ID("sv << a_vid << ")"sv;
 	};
 	for (const auto& [name, rid, vids] : results)
 	{
@@ -304,7 +300,7 @@ void dump_rtti()
 		const std::span svids{ vids.data(), vids.size() };
 		if (!svids.empty())
 		{
-			file << "\t\tinline constexpr std::array<REL::Offset, "sv
+			file << "\t\tinline constexpr std::array<REL::ID, "sv
 				 << vids.size()
 				 << "> "sv
 				 << name
@@ -324,20 +320,20 @@ void dump_rtti()
 void dump_nirtti()
 {
 	constexpr std::array seeds = {
-		0x9476120,  // NiObject
-		0x9485A78,  // NiShader
-		0x9487AB0,  // BSFaceGenMorphData
-		0x9487D28,  // BSTempEffect
-		0x9482870,  // bhkCharacterProxy
-		0x9473DC0,  // bhkWorld
-		0x94849B8,  // bhkWorldM
+		1668961,  // NiObject
+		1678544,  // NiShader
+		1680059,  // BSFaceGenMorphData
+		1680202,  // BSTempEffect
+		1676040,  // bhkCharacterProxy
+		1667733,  // bhkWorld
+		1677658,  // bhkWorldM
 	};
 
 	std::unordered_set<std::uintptr_t> results;
 	results.reserve(seeds.size());
 	for (const auto& seed : seeds)
 	{
-		results.insert(REL::Offset(seed).address());
+		results.insert(REL::ID(seed).address());
 	}
 
 	const auto mod = REL::Module::GetSingleton();
@@ -364,14 +360,13 @@ void dump_nirtti()
 	while (found);
 
 	std::vector<std::pair<std::string, std::uint64_t>> toPrint;
-	// const auto& iddb = get_iddb();
+	const auto                                         iddb = get_iddb();
 	for (const auto& result : results)
 	{
 		const auto rtti = reinterpret_cast<const RE::NiRTTI*>(result);
 		try
 		{
-			//const auto id = iddb(result - base);
-			const auto id = (result - base);
+			const auto id = iddb->get_id(result - base);
 			toPrint.emplace_back(sanitize_name(rtti->GetName()), id);
 		}
 		catch (const std::exception&)
@@ -396,7 +391,7 @@ void dump_nirtti()
 		   << "\t{\n"sv;
 	for (const auto& elem : toPrint)
 	{
-		output << "\t\tinline constexpr REL::Offset "sv << elem.first << "{ "sv << elem.second << " };\n"sv;
+		output << "\t\tinline constexpr REL::ID "sv << elem.first << "{ "sv << elem.second << " };\n"sv;
 	}
 	output << "\t}\n"sv
 		   << "}\n"sv;
