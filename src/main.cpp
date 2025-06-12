@@ -1,8 +1,10 @@
+/*
 [[nodiscard]] auto& get_iddb()
 {
 	static REL::Offset2ID iddb;
 	return iddb;
 }
+*/
 
 class VTable
 {
@@ -25,29 +27,22 @@ public:
 		_vtables = virtual_tables({ cols.data(), cols.size() });
 	}
 
-	[[nodiscard]] reference operator[](std::size_t a_idx) noexcept { return _vtables[a_idx]; }
-
+	[[nodiscard]] reference       operator[](std::size_t a_idx) noexcept { return _vtables[a_idx]; }
 	[[nodiscard]] const_reference operator[](std::size_t a_idx) const noexcept { return _vtables[a_idx]; }
-
-	[[nodiscard]] iterator begin() noexcept { return _vtables.begin(); }
-
-	[[nodiscard]] const_iterator begin() const noexcept { return _vtables.begin(); }
-
-	[[nodiscard]] const_iterator cbegin() const noexcept { return _vtables.cbegin(); }
-
-	[[nodiscard]] iterator end() noexcept { return _vtables.end(); }
-
-	[[nodiscard]] const_iterator end() const noexcept { return _vtables.end(); }
-
-	[[nodiscard]] const_iterator cend() const noexcept { return _vtables.cend(); }
-
-	[[nodiscard]] size_type size() const noexcept { return _vtables.size(); }
+	[[nodiscard]] iterator        begin() noexcept { return _vtables.begin(); }
+	[[nodiscard]] const_iterator  begin() const noexcept { return _vtables.begin(); }
+	[[nodiscard]] const_iterator  cbegin() const noexcept { return _vtables.cbegin(); }
+	[[nodiscard]] iterator        end() noexcept { return _vtables.end(); }
+	[[nodiscard]] const_iterator  end() const noexcept { return _vtables.end(); }
+	[[nodiscard]] const_iterator  cend() const noexcept { return _vtables.cend(); }
+	[[nodiscard]] size_type       size() const noexcept { return _vtables.size(); }
 
 private:
 	[[nodiscard]] static const RE::RTTI::TypeDescriptor* type_descriptor(std::string_view a_name)
 	{
-		const auto segment = REL::Module::get().segment(REL::Segment::data);
-		const std::span haystack{ segment.pointer<const char>(), segment.size() };
+		const auto      mod = REL::Module::GetSingleton();
+		const auto      seg = mod->segment(REL::Segment::data);
+		const std::span haystack{ seg.pointer<const char>(), seg.size() };
 
 		std::boyer_moore_horspool_searcher searcher(a_name.cbegin(), a_name.cend());
 		const auto [first, last] = searcher(haystack.begin(), haystack.end());
@@ -66,14 +61,13 @@ private:
 	{
 		assert(a_typeDesc != nullptr);
 
-		const auto& mod = REL::Module::get();
+		const auto mod = REL::Module::GetSingleton();
 		const auto typeDesc = reinterpret_cast<std::uintptr_t>(a_typeDesc);
-		const auto rva = static_cast<std::uint32_t>(typeDesc - mod.base());
-
-		const auto segment = mod.segment(REL::Segment::rdata);
-		const auto base = segment.pointer<const std::byte>();
+		const auto rva = static_cast<std::uint32_t>(typeDesc - mod->base());
+		const auto seg = mod->segment(REL::Segment::rdata);
+		const auto base = seg.pointer<const std::byte>();
 		const auto start = reinterpret_cast<const std::uint32_t*>(base);
-		const auto end = reinterpret_cast<const std::uint32_t*>(base + segment.size());
+		const auto end = reinterpret_cast<const std::uint32_t*>(base + seg.size());
 
 		std::vector<const RE::RTTI::CompleteObjectLocator*> results;
 
@@ -83,7 +77,7 @@ private:
 			{
 				// both base class desc and col can point to the type desc so we check
 				// the next int to see if it can be an rva to decide which type it is
-				if ((iter[1] < segment.offset()) || (segment.offset() + segment.size() <= iter[1]))
+				if ((iter[1] < seg.offset()) || (seg.offset() + seg.size() <= iter[1]))
 				{
 					continue;
 				}
@@ -100,13 +94,13 @@ private:
 	[[nodiscard]] static container_type virtual_tables(std::span<const RE::RTTI::CompleteObjectLocator*> a_cols)
 	{
 		assert(std::all_of(a_cols.begin(), a_cols.end(), [](auto&& a_elem) noexcept
-		                   { return a_elem != nullptr; }));
+			{ return a_elem != nullptr; }));
 
-		const auto segment = REL::Module::get().segment(REL::Segment::rdata);
-		const auto base = segment.pointer<const std::byte>();
-		const auto start = reinterpret_cast<const std::uintptr_t*>(base);
-		const auto end = reinterpret_cast<const std::uintptr_t*>(base + segment.size());
-
+		const auto     mod = REL::Module::GetSingleton();
+		const auto     seg = mod->segment(REL::Segment::rdata);
+		const auto     base = seg.pointer<const std::byte>();
+		const auto     start = reinterpret_cast<const std::uintptr_t*>(base);
+		const auto     end = reinterpret_cast<const std::uintptr_t*>(base + seg.size());
 		container_type results;
 
 		for (auto iter = start; iter < end; ++iter)
@@ -149,15 +143,15 @@ private:
 		std::make_pair(
 			std::regex{ R"regex((`anonymous namespace'|[ &'*\-`]){1})regex"s, std::regex::ECMAScript },
 			std::function{ [](std::string& a_name, const std::ssub_match& a_match)
-		                   {
-							   a_name.erase(a_match.first, a_match.second);
-						   } }),
+				{
+					a_name.erase(a_match.first, a_match.second);
+				} }),
 		std::make_pair(
 			std::regex{ R"regex(([(),:<>]){1})regex"s, std::regex::ECMAScript },
 			std::function{ [](std::string& a_name, const std::ssub_match& a_match)
-		                   {
-							   a_name.replace(a_match.first, a_match.second, "_"sv);
-						   } }),
+				{
+					a_name.replace(a_match.first, a_match.second, "_"sv);
+				} }),
 	};
 
 	std::smatch matches;
@@ -180,7 +174,7 @@ private:
 	assert(a_typeDesc != nullptr);
 
 	std::array<char, 0x1000> buf;
-	const auto len =
+	const auto               len =
 		REX::W32::UnDecorateSymbolName(
 			a_typeDesc->raw_name() + 1,
 			buf.data(),
@@ -223,10 +217,10 @@ void dump_rtti()
 {
 	std::vector<std::tuple<std::string, std::uint64_t, std::vector<std::uint64_t>>> results;  // [ demangled name, rtti id, vtable ids ]
 
-	VTable typeInfo(".?AVtype_info@@"sv);
-	const auto& mod = REL::Module::get();
-	const auto baseAddr = mod.base();
-	const auto data = mod.segment(REL::Segment::data);
+	VTable     typeInfo(".?AVtype_info@@"sv);
+	const auto mod = REL::Module::GetSingleton();
+	const auto base = mod->base();
+	const auto data = mod->segment(REL::Segment::data);
 	const auto beg = data.pointer<const std::uintptr_t>();
 	const auto end = reinterpret_cast<const std::uintptr_t*>(data.address() + data.size());
 	// const auto& iddb = get_iddb();
@@ -238,10 +232,10 @@ void dump_rtti()
 			try
 			{
 				auto name = decode_name(typeDescriptor);
-				// const auto rid = iddb(reinterpret_cast<std::uintptr_t>(iter) - baseAddr);
-				const auto rid = reinterpret_cast<std::uintptr_t>(iter) - baseAddr;
+				// const auto rid = iddb(reinterpret_cast<std::uintptr_t>(iter) - base);
+				const auto rid = reinterpret_cast<std::uintptr_t>(iter) - base;
 
-				VTable vtable{ typeDescriptor };
+				VTable                     vtable{ typeDescriptor };
 				std::vector<std::uint64_t> vids(vtable.size());
 				std::transform(
 					vtable.begin(),
@@ -273,9 +267,10 @@ void dump_rtti()
 		results.end());
 
 	std::ofstream file;
-	const auto openf = [&](std::string_view a_name)
+	const auto    openf = [&](std::string_view a_name)
 	{
-		file.open(a_name.data() + "_IDs.h"s);
+		const auto filename = std::vformat("IDs_{}.h"sv, std::make_format_args(a_name));
+		file.open(filename);
 		file << "#pragma once\n"sv
 			 << "\n"sv
 			 << "namespace RE\n"sv
@@ -329,14 +324,15 @@ void dump_rtti()
 void dump_nirtti()
 {
 	constexpr std::array seeds = {
-		0x94B79A0,  // NiObject
-		0x94C72F8,  // NiShader
-		0x94C9330,  // BSFaceGenMorphData
-		0x94C95A8,  // BSTempEffect
-		0x94C40F0,  // bhkCharacterProxy
-		0x94B5640,  // bhkWorld
-		0x94C6238,  // bhkWorldM
+		0x9476120,  // NiObject
+		0x9485A78,  // NiShader
+		0x9487AB0,  // BSFaceGenMorphData
+		0x9487D28,  // BSTempEffect
+		0x9482870,  // bhkCharacterProxy
+		0x9473DC0,  // bhkWorld
+		0x94849B8,  // bhkWorldM
 	};
+
 	std::unordered_set<std::uintptr_t> results;
 	results.reserve(seeds.size());
 	for (const auto& seed : seeds)
@@ -344,12 +340,12 @@ void dump_nirtti()
 		results.insert(REL::Offset(seed).address());
 	}
 
-	const auto& mod = REL::Module::get();
-	const auto base = mod.base();
-	const auto segment = mod.segment(REL::Segment::data);
-	const auto beg = segment.pointer<const std::uintptr_t>();
-	const auto end = reinterpret_cast<const std::uintptr_t*>(segment.address() + segment.size());
-	bool found = false;
+	const auto mod = REL::Module::GetSingleton();
+	const auto base = mod->base();
+	const auto seg = mod->segment(REL::Segment::data);
+	const auto beg = seg.pointer<const std::uintptr_t>();
+	const auto end = reinterpret_cast<const std::uintptr_t*>(seg.address() + seg.size());
+	bool       found = false;
 	do
 	{
 		found = false;
@@ -391,7 +387,7 @@ void dump_nirtti()
 	};
 	std::sort(toPrint.begin(), toPrint.end(), comp);
 
-	std::ofstream output("NiRTTI_IDs.h");
+	std::ofstream output("IDs_NiRTTI.h");
 	output << "#pragma once\n"sv
 		   << "\n"sv
 		   << "namespace RE\n"sv
@@ -417,8 +413,7 @@ namespace
 			{
 				dump_rtti();
 				dump_nirtti();
-
-				OBSE::stl::report_and_fail("Done!");
+				REX::FAIL("Done!");
 			}
 			catch (const std::exception& e)
 			{
